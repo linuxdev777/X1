@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DARK INK MINT — Ink</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.12.0/dist/ethers.umd.min.js"></script>
+
+<style>
+body{
+  margin:0;
+  background:#0b0b0b;
+  color:#eaeaea;
+  font-family: monospace;
+}
+.wrapper{
+  max-width:520px;
+  margin:60px auto;
+  padding:24px;
+  border:1px solid #222;
+  background:#111;
+}
+h1{
+  text-align:center;
+  letter-spacing:0.25em;
+  margin-bottom:8px;
+}
+.sub{
+  text-align:center;
+  font-size:13px;
+  opacity:.7;
+  margin-bottom:20px;
+}
+.supply{
+  text-align:center;
+  margin-bottom:16px;
+  font-size:14px;
+}
+.card{
+  border:1px solid #333;
+  padding:18px;
+}
+input{
+  width:100%;
+  padding:10px;
+  background:#000;
+  border:1px solid #333;
+  color:#fff;
+  font-size:16px;
+  margin-bottom:12px;
+}
+button{
+  width:100%;
+  padding:12px;
+  font-size:14px;
+  cursor:pointer;
+  border:none;
+  margin-top:6px;
+}
+.primary{
+  background:#fff;
+  color:#000;
+}
+.outline{
+  background:transparent;
+  border:1px solid #444;
+  color:#fff;
+}
+.status{
+  margin-top:14px;
+  font-size:13px;
+  white-space:pre-wrap;
+}
+</style>
+</head>
+
+<body>
+<div class="wrapper">
+
+<h1>DARK INK MINT</h1>
+<div class="sub">0.00005 ETH</div>
+
+<div id="supply" class="supply">Loading supply…</div>
+
+<div class="card">
+  <input type="number" id="qty" min="1" max="20" value="1">
+  <button class="primary" id="connectBtn">Connect Wallet</button>
+  <button class="outline" id="mintBtn" disabled>Mint</button>
+  <div id="status" class="status">Idle</div>
+</div>
+
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const CONTRACT_ADDRESS = "0xc8016b795F2321417299bBEc817f6098EB7e5cC5";
+
+/* INK RPC */
+const RPC_URL = "https://rpc-qnd.inkonchain.com";
+
+/* PRICE */
+const MINT_PRICE = ethers.parseEther("0.00000001");
+
+/* INK NETWORK PARAMS */
+const INK_PARAMS = {
+  chainId: "0xDEF1", // 57073
+  chainName: "Ink",
+  nativeCurrency: {
+    name: "Ether",
+    symbol: "ETH",
+    decimals: 18
+  },
+  rpcUrls: ["https://rpc-qnd.inkonchain.com"],
+  blockExplorerUrls: ["https://explorer.inkonchain.com"]
+};
+
+const ABI = [
+  "function mint(uint256 quantity) external payable",
+  "function totalMinted() view returns (uint256)",
+  "function MAX_SUPPLY() view returns (uint256)"
+];
+
+let provider, signer, contract;
+
+/* ================= HELPERS ================= */
+function log(msg){
+  document.getElementById("status").textContent = msg;
+}
+
+/* ================= LOAD SUPPLY ================= */
+(async()=>{
+  try{
+    const rpc = new ethers.JsonRpcProvider(RPC_URL);
+    const c = new ethers.Contract(CONTRACT_ADDRESS, ABI, rpc);
+    const minted = await c.totalMinted();
+    const max = await c.MAX_SUPPLY();
+    document.getElementById("supply").textContent =
+      `Minted: ${minted} / ${max}`;
+  }catch{
+    document.getElementById("supply").textContent = "Minted: ? / ?";
+  }
+})();
+
+/* ================= CONNECT ================= */
+document.getElementById("connectBtn").onclick = async ()=>{
+  try{
+    if(!window.ethereum) return log("No wallet detected");
+
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: INK_PARAMS.chainId }]
+    }).catch(async ()=>{
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [INK_PARAMS]
+      });
+    });
+
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+    log("Wallet connected\nReady to mint");
+    document.getElementById("mintBtn").disabled = false;
+
+  }catch(err){
+    log("Connect error:\n" + (err.message || err));
+  }
+};
+
+/* ================= MINT ================= */
+document.getElementById("mintBtn").onclick = async ()=>{
+  try{
+    const qty = parseInt(document.getElementById("qty").value);
+    if(qty < 1) return log("Invalid quantity");
+
+    const total = MINT_PRICE * BigInt(qty);
+
+    log("Sending mint tx…");
+    const tx = await contract.mint(qty,{
+      value: total,
+      gasLimit: 300000n * BigInt(qty)
+    });
+
+    log("Waiting confirmation…\n" + tx.hash);
+    await tx.wait();
+
+    log("✅ Mint confirmed\n" + tx.hash);
+
+  }catch(err){
+    log("Mint error:\n" + (err.reason || err.message || err));
+  }
+};
+</script>
+
+</body>
+</html>
