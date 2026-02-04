@@ -166,9 +166,16 @@ document.getElementById("mintBtn").onclick = async ()=>{
 
     const total = MINT_PRICE * BigInt(qty);
 
-    // GAS PRICE FIX — Aumentar un poco para evitar errores
-    const baseGas = await provider.getGasPrice();
-    const gasPrice = baseGas * 120n / 100n; // +20% margen
+    // GAS FEE (ethers v6) — usamos getFeeData
+    const feeData = await provider.getFeeData();
+    // Intentamos usar gasPrice; si no, maxFeePerGas
+    let gasPrice = feeData.gasPrice ?? feeData.maxFeePerGas;
+    if(!gasPrice){
+      // fallback muy básico
+      gasPrice = 1_000_000_000n; // 1 gwei
+    }
+    // pequeño margen (+20%)
+    gasPrice = gasPrice * 120n / 100n;
 
     log("Sending mint tx…");
 
