@@ -95,22 +95,13 @@ button{
 <script>
 /* ================= CONFIG ================= */
 const CONTRACT_ADDRESS = "0xc8016b795F2321417299bBEc817f6098EB7e5cC5";
-
-/* INK RPC */
 const RPC_URL = "https://rpc-qnd.inkonchain.com";
-
-/* PRICE */
 const MINT_PRICE = ethers.parseEther("0.00000001");
 
-/* INK NETWORK PARAMS */
 const INK_PARAMS = {
-  chainId: "0xDEF1", // 57073
+  chainId: "0xDEF1",
   chainName: "Ink",
-  nativeCurrency: {
-    name: "Ether",
-    symbol: "ETH",
-    decimals: 18
-  },
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: ["https://rpc-qnd.inkonchain.com"],
   blockExplorerUrls: ["https://explorer.inkonchain.com"]
 };
@@ -123,7 +114,6 @@ const ABI = [
 
 let provider, signer, contract;
 
-/* ================= HELPERS ================= */
 function log(msg){
   document.getElementById("status").textContent = msg;
 }
@@ -135,8 +125,7 @@ function log(msg){
     const c = new ethers.Contract(CONTRACT_ADDRESS, ABI, rpc);
     const minted = await c.totalMinted();
     const max = await c.MAX_SUPPLY();
-    document.getElementById("supply").textContent =
-      `Minted: ${minted} / ${max}`;
+    document.getElementById("supply").textContent = `Minted: ${minted} / ${max}`;
   }catch{
     document.getElementById("supply").textContent = "Minted: ? / ?";
   }
@@ -177,10 +166,16 @@ document.getElementById("mintBtn").onclick = async ()=>{
 
     const total = MINT_PRICE * BigInt(qty);
 
+    // GAS PRICE FIX — Aumentar un poco para evitar errores
+    const baseGas = await provider.getGasPrice();
+    const gasPrice = baseGas * 120n / 100n; // +20% margen
+
     log("Sending mint tx…");
+
     const tx = await contract.mint(qty,{
       value: total,
-      gasLimit: 300000n * BigInt(qty)
+      gasLimit: 300000n * BigInt(qty),
+      gasPrice: gasPrice
     });
 
     log("Waiting confirmation…\n" + tx.hash);
